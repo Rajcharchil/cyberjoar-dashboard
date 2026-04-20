@@ -1,0 +1,2873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CYBERJOAR Strategic Intelligence Fusion Dashboard</title>
+  <link rel="icon" type="image/svg+xml" href='data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Ctext y="50" font-size="48"%3E%F0%9F%9B%A1%EF%B8%8F%3C/text%3E%3C/svg%3E'>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  >
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --primary: #00ff41;
+      --secondary: #ff6b00;
+      --critical: #ff0000;
+      --panel-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--primary);
+      font-family: "Share Tech Mono", monospace;
+      overflow: hidden;
+    }
+
+    body {
+      position: relative;
+      background-image:
+        linear-gradient(rgba(0, 255, 65, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 65, 0.05) 1px, transparent 1px),
+        radial-gradient(circle at 20% 20%, rgba(0, 255, 65, 0.06), transparent 40%);
+      background-size: 30px 30px, 30px 30px, cover;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.04) 0px,
+        rgba(255, 255, 255, 0.04) 1px,
+        rgba(0, 0, 0, 0.0) 2px,
+        rgba(0, 0, 0, 0.0) 4px
+      );
+      mix-blend-mode: screen;
+      opacity: 0.2;
+      z-index: 40;
+    }
+
+    .dashboard {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: 78px 1fr 58px;
+      gap: 10px;
+      padding: 10px;
+    }
+
+    .panel {
+      border: 1px solid var(--primary);
+      box-shadow: var(--panel-shadow);
+      background: rgba(0, 0, 0, 0.75);
+      animation: panelGlow 6s ease-in-out infinite;
+    }
+
+    @keyframes panelGlow {
+      0%, 100% {
+        box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
+      }
+      50% {
+        box-shadow: 0 0 16px rgba(0, 255, 65, 0.4);
+      }
+    }
+
+    .header {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 0 14px;
+      overflow: hidden;
+    }
+
+    .title {
+      font-size: clamp(0.95rem, 1.9vw, 1.45rem);
+      white-space: nowrap;
+    }
+
+    .status-inline {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.95rem;
+      justify-self: center;
+    }
+
+    .status-inline .status-text {
+      animation: statusBlink 2.2s ease-in-out infinite;
+    }
+
+    @keyframes statusBlink {
+      0%, 40% { opacity: 1; }
+      50% { opacity: 0.35; }
+      60%, 100% { opacity: 1; }
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--primary);
+      box-shadow: 0 0 12px var(--primary);
+      animation: pulse 1.3s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 0.75;
+      }
+      50% {
+        transform: scale(1.3);
+        opacity: 1;
+      }
+    }
+
+    .clock {
+      justify-self: center;
+      color: #9bffb7;
+      font-size: 0.95rem;
+    }
+
+    .classification {
+      justify-self: end;
+      color: var(--secondary);
+      border: 1px solid var(--secondary);
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      background: rgba(255, 107, 0, 0.08);
+      white-space: nowrap;
+    }
+
+    .main {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 280px 1fr 300px;
+      gap: 10px;
+      position: relative;
+    }
+
+    .sidebar,
+    .feed {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .sidebar {
+      height: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: #00ff41 #0a0a0a;
+    }
+
+    .sidebar::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .sidebar::-webkit-scrollbar-track {
+      background: #0a0a0a;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb {
+      background: #00ff41;
+      border-radius: 2px;
+    }
+
+    .section-title {
+      color: var(--secondary);
+      font-size: 0.84rem;
+      margin-bottom: 8px;
+      letter-spacing: 0.08em;
+    }
+
+    .mongo-cloud-panel {
+      margin-top: 4px;
+    }
+
+    .mongo-status {
+      font-size: 0.72rem;
+      margin: 4px 0 8px;
+      letter-spacing: 0.04em;
+    }
+
+    .mongo-status.connected {
+      color: #41ff72;
+      text-shadow: 0 0 8px rgba(65, 255, 114, 0.45);
+    }
+
+    .mongo-status.disconnected {
+      color: #ff4444;
+      text-shadow: 0 0 8px rgba(255, 68, 68, 0.35);
+    }
+
+    .btn-mongo-sync {
+      width: 100%;
+      font-size: 0.76rem;
+      margin-bottom: 6px;
+    }
+
+    .btn-mongo-seed {
+      width: 100%;
+      font-size: 0.68rem;
+      padding: 5px 8px;
+      opacity: 0.95;
+    }
+
+    .node-search {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .node-search input {
+      flex: 1;
+      border: 1px solid rgba(0, 255, 65, 0.45);
+      background: #070707;
+      color: var(--primary);
+      font-family: "Share Tech Mono", monospace;
+      padding: 8px 9px;
+      font-size: 0.75rem;
+    }
+
+    .clear-search {
+      min-width: 30px;
+      padding: 8px 0;
+      line-height: 1;
+    }
+
+    .ai-panel-header {
+      width: 100%;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+    }
+
+    .ai-panel-header .caret {
+      transition: transform 0.2s ease;
+    }
+
+    .ai-panel.collapsed .ai-panel-header .caret {
+      transform: rotate(-90deg);
+    }
+
+    .ai-panel-body {
+      display: grid;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .ai-panel.collapsed .ai-panel-body {
+      display: none;
+    }
+
+    .ai-label {
+      font-size: 0.72rem;
+      color: #9bffb7;
+    }
+
+    .ai-input,
+    .ai-textarea,
+    .ai-select {
+      width: 100%;
+      border: 1px solid rgba(0, 255, 65, 0.45);
+      background: #060606;
+      color: var(--primary);
+      padding: 7px 8px;
+      font-family: "Share Tech Mono", monospace;
+      font-size: 0.76rem;
+    }
+
+    .ai-textarea {
+      resize: vertical;
+      min-height: 72px;
+    }
+
+    .ai-generate {
+      width: 100%;
+      color: #d4ffe0;
+      background: linear-gradient(180deg, rgba(0, 255, 65, 0.24), rgba(0, 255, 65, 0.08));
+      box-shadow: 0 0 10px rgba(0, 255, 65, 0.35);
+      font-size: 0.8rem;
+    }
+
+    .ai-status {
+      min-height: 16px;
+      color: #f1a168;
+      font-size: 0.72rem;
+      opacity: 0.85;
+    }
+
+    .report-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 99999;
+      background: #0a0a0a;
+      display: none;
+      flex-direction: column;
+      padding: 18px;
+      isolation: isolate;
+      transform: translateZ(0);
+    }
+
+    .report-modal.open {
+      display: flex;
+    }
+
+    .report-modal::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.03) 0px,
+        rgba(255, 255, 255, 0.03) 1px,
+        rgba(0, 0, 0, 0.0) 2px,
+        rgba(0, 0, 0, 0.0) 4px
+      );
+      animation: modalScan 5s linear infinite;
+      opacity: 0.2;
+    }
+
+    @keyframes modalScan {
+      from { transform: translateY(-6px); }
+      to { transform: translateY(6px); }
+    }
+
+    .report-modal-header,
+    .report-modal-actions,
+    .report-modal-body {
+      position: relative;
+      z-index: 1;
+    }
+
+    .report-modal-header {
+      border: 1px solid var(--primary);
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      background: rgba(0, 0, 0, 0.75);
+    }
+
+    .report-title {
+      color: #f1a168;
+      margin-bottom: 6px;
+    }
+
+    .report-classification {
+      color: #f1a168;
+      font-size: 0.76rem;
+    }
+
+    .report-modal-body {
+      flex: 1;
+      border: 1px solid rgba(0, 255, 65, 0.45);
+      padding: 14px;
+      overflow: auto;
+      white-space: pre-wrap;
+      line-height: 1.5;
+      font-size: 0.86rem;
+      background: rgba(0, 0, 0, 0.72);
+      color: #f1a168;
+    }
+
+    .report-modal-body.error {
+      color: #f1a168;
+      border-color: var(--critical);
+    }
+
+    .report-modal-body.typing::after {
+      content: "▋";
+      color: #f1a168;
+      animation: reportCaretBlink 0.9s steps(1, end) infinite;
+      margin-left: 2px;
+    }
+
+    @keyframes reportCaretBlink {
+      0%, 45% { opacity: 1; }
+      46%, 100% { opacity: 0; }
+    }
+
+    .report-modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 10px;
+    }
+
+    .filter-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    button,
+    select {
+      border: 1px solid var(--primary);
+      background: #070707;
+      color: var(--primary);
+      font-family: inherit;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    button:hover,
+    select:hover {
+      box-shadow: 0 0 10px rgba(0, 255, 65, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .active-filter {
+      background: rgba(0, 255, 65, 0.2);
+    }
+
+    .threat-select {
+      width: 100%;
+    }
+
+    .upload-zone {
+      border: 1px dashed var(--primary);
+      min-height: 140px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 12px;
+      color: #b8ffca;
+      background: rgba(0, 255, 65, 0.05);
+      transition: all 0.2s ease;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .upload-zone .upload-copy {
+      font-size: 0.78rem;
+      line-height: 1.5;
+    }
+
+    .upload-zone .upload-icons {
+      color: var(--secondary);
+      font-size: 1rem;
+      margin-top: 6px;
+    }
+
+    .upload-zone.dragover {
+      border-style: solid;
+      border-color: #41ff72;
+      color: #d4ffe0;
+      background: rgba(0, 255, 65, 0.2);
+      animation: ingestFlash 0.6s infinite alternate;
+    }
+
+    .upload-zone.processing {
+      border-style: solid;
+      border-color: var(--primary);
+      background: rgba(0, 255, 65, 0.1);
+    }
+
+    .upload-zone.success {
+      border-style: solid;
+      border-color: #41ff72;
+      background: rgba(0, 255, 65, 0.18);
+      color: #d4ffe0;
+    }
+
+    .upload-zone.error {
+      border-style: solid;
+      border-color: var(--critical);
+      background: rgba(255, 0, 0, 0.15);
+      color: #ffb0b0;
+      animation: errorFlash 0.16s 6;
+    }
+
+    .upload-progress {
+      width: 100%;
+      margin-top: 8px;
+      height: 10px;
+      border: 1px solid rgba(0, 255, 65, 0.7);
+      background: #031308;
+      overflow: hidden;
+    }
+
+    .upload-progress-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #0f421f, #00ff41);
+      animation: uploadProgressFill 1.5s linear forwards;
+    }
+
+    @keyframes uploadProgressFill {
+      from { width: 0%; }
+      to { width: 100%; }
+    }
+
+    @keyframes ingestFlash {
+      from { box-shadow: 0 0 8px rgba(0, 255, 65, 0.25); }
+      to { box-shadow: 0 0 16px rgba(0, 255, 65, 0.55); }
+    }
+
+    @keyframes errorFlash {
+      from { filter: brightness(0.95); }
+      to { filter: brightness(1.2); }
+    }
+
+    .map-instruction {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 710;
+      padding: 8px 12px;
+      border: 1px solid var(--secondary);
+      background: rgba(0, 0, 0, 0.82);
+      color: #ffd1ae;
+      font-size: 0.78rem;
+      display: none;
+    }
+
+    .map-instruction.active {
+      display: block;
+    }
+
+    #map {
+      position: relative;
+      padding: 18px;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    .map-heading {
+      color: #9bffb7;
+      font-size: 0.9rem;
+    }
+
+    .map-canvas {
+      flex: 1;
+      border: 1px solid rgba(0, 255, 65, 0.65);
+      background:
+        linear-gradient(transparent 95%, rgba(0, 255, 65, 0.15) 100%),
+        linear-gradient(90deg, transparent 95%, rgba(0, 255, 65, 0.15) 100%),
+        radial-gradient(circle at center, rgba(0, 255, 65, 0.09), rgba(0, 0, 0, 0.9));
+      background-size: 38px 38px, 38px 38px, cover;
+      position: relative;
+    }
+
+    .map-canvas::before,
+    .map-canvas::after {
+      content: "";
+      position: absolute;
+      background: rgba(0, 255, 65, 0.5);
+    }
+
+    .map-canvas::before {
+      width: 1px;
+      height: 100%;
+      left: 50%;
+      top: 0;
+    }
+
+    .map-canvas::after {
+      height: 1px;
+      width: 100%;
+      left: 0;
+      top: 50%;
+    }
+
+    .map-inner {
+      position: relative;
+      flex: 1;
+      border: 1px solid rgba(0, 255, 65, 0.65);
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .radar-widget {
+      position: absolute;
+      top: 100px;
+      right: 15px;
+      bottom: auto;
+      width: 150px;
+      height: 150px;
+      border: 1px solid #00ff41;
+      border-radius: 50%;
+      background: radial-gradient(circle, #0a1a0a 0%, #000 100%);
+      z-index: 1000;
+      overflow: hidden;
+      box-shadow: 0 0 15px rgba(0, 255, 65, 0.4), inset 0 0 10px rgba(0, 0, 0, 0.8);
+    }
+
+    .radar-widget.alert {
+      border-color: #ff0000;
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.6), inset 0 0 10px rgba(0, 0, 0, 0.8);
+    }
+
+    .radar-ring {
+      position: absolute;
+      border: 1px solid rgba(0, 255, 65, 0.2);
+      border-radius: 50%;
+      z-index: 1;
+    }
+
+    .radar-ring.r1 { inset: 18px; }
+    .radar-ring.r2 { inset: 36px; }
+    .radar-ring.r3 { inset: 54px; }
+
+    .radar-crosshair-h,
+    .radar-crosshair-v {
+      position: absolute;
+      background: rgba(0, 255, 65, 0.3);
+      z-index: 1;
+    }
+
+    .radar-crosshair-h {
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 1px;
+      transform: translateY(-0.5px);
+    }
+
+    .radar-crosshair-v {
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 1px;
+      transform: translateX(-0.5px);
+    }
+
+    .radar-sweep {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 72px;
+      height: 2px;
+      transform-origin: 0 50%;
+      background: linear-gradient(90deg, rgba(0, 255, 65, 0.95) 0%, rgba(0, 255, 65, 0.55) 40%, rgba(0, 255, 65, 0) 100%);
+      animation: radarSweep 3.8s linear infinite;
+      z-index: 2;
+    }
+
+    .radar-widget.alert .radar-sweep {
+      background: linear-gradient(90deg, rgba(255, 0, 0, 0.95) 0%, rgba(255, 0, 0, 0.55) 40%, rgba(255, 0, 0, 0) 100%);
+    }
+
+    .radar-cardinal {
+      position: absolute;
+      font-size: 8px;
+      color: rgba(0, 255, 65, 0.5);
+      z-index: 3;
+      line-height: 1;
+    }
+
+    .radar-cardinal.n {
+      top: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .radar-cardinal.e {
+      right: 5px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .radar-label {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      color: #00ff41;
+      letter-spacing: 3px;
+      white-space: nowrap;
+      z-index: 3;
+    }
+
+    .radar-dot {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #9bffb7;
+      box-shadow: 0 0 4px #00ff41;
+      animation: radarBlink 1.6s steps(1, end) infinite;
+      z-index: 4;
+      transition: left 0.9s ease, top 0.9s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .radar-dot.alert-dot {
+      background: #ff6666;
+      box-shadow: 0 0 6px #ff0000;
+    }
+
+    .radar-widget.alert .radar-dot {
+      background: #ff6666;
+      box-shadow: 0 0 6px #ff0000;
+      animation-duration: 0.7s;
+    }
+
+    .radar-widget.alert .radar-label {
+      color: #ff4f4f;
+      letter-spacing: 1px;
+    }
+
+    @keyframes radarSweep {
+      from { transform: rotate(-90deg); }
+      to { transform: rotate(270deg); }
+    }
+
+    @keyframes radarBlink {
+      0%, 62% { opacity: 0.25; }
+      63%, 100% { opacity: 1; }
+    }
+
+    #leafletMap {
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+    }
+
+    #leafletMap .leaflet-tile {
+      filter: grayscale(30%) sepia(20%) hue-rotate(80deg) brightness(0.7);
+    }
+
+    #leafletMap .leaflet-control-attribution {
+      background: rgba(0, 0, 0, 0.7);
+      color: var(--primary);
+      font-family: "Share Tech Mono", monospace;
+      border: 1px solid rgba(0, 255, 65, 0.45);
+      border-bottom: none;
+      border-right: none;
+      padding: 2px 8px;
+      text-transform: uppercase;
+    }
+
+    #leafletMap .leaflet-control-attribution a {
+      color: #9bffb7;
+    }
+
+    #leafletMap .leaflet-control-zoom {
+      border: 1px solid var(--primary);
+      box-shadow: var(--panel-shadow);
+    }
+
+    #leafletMap .leaflet-control-zoom a {
+      background: rgba(0, 0, 0, 0.85);
+      color: var(--primary);
+      border-bottom: 1px solid rgba(0, 255, 65, 0.35);
+      font-family: "Share Tech Mono", monospace;
+    }
+
+    #leafletMap .leaflet-control-zoom a:hover {
+      background: rgba(0, 255, 65, 0.16);
+      color: #d4ffe0;
+    }
+
+    .map-coords {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      z-index: 700;
+      padding: 6px 10px;
+      border: 1px solid rgba(0, 255, 65, 0.5);
+      background: rgba(0, 0, 0, 0.75);
+      color: #9bffb7;
+      font-size: 0.8rem;
+      pointer-events: none;
+    }
+
+    .leaflet-control.command-label,
+    .leaflet-control.command-button {
+      border: 1px solid var(--primary);
+      background: rgba(0, 0, 0, 0.82);
+      color: var(--primary);
+      box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
+      font-family: "Share Tech Mono", monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .leaflet-control.command-label {
+      padding: 7px 10px;
+      font-size: 0.74rem;
+    }
+
+    .leaflet-control.command-button button {
+      border: none;
+      background: transparent;
+      color: inherit;
+      font-family: inherit;
+      font-size: 0.75rem;
+      padding: 7px 9px;
+      cursor: pointer;
+      text-transform: inherit;
+      letter-spacing: inherit;
+    }
+
+    .leaflet-control.command-button button:hover {
+      background: rgba(0, 255, 65, 0.15);
+    }
+
+    .intel-marker {
+      position: relative;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .intel-marker::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 12px currentColor;
+      z-index: 2;
+    }
+
+    .intel-marker::after {
+      content: "";
+      position: absolute;
+      inset: -8px;
+      border: 1px solid currentColor;
+      border-radius: 50%;
+      opacity: 0.85;
+      animation: pulseRing 2.2s infinite;
+      z-index: 1;
+    }
+
+    .intel-osint { color: #2d8dff; }
+    .intel-humint { color: #00ff41; }
+    .intel-imint { color: #ff2f2f; }
+    .intel-marker.match::after { border-color: #f8ff7a; box-shadow: 0 0 10px #f8ff7a; }
+    .intel-marker.reviewed::before { background: #5dff84; box-shadow: 0 0 12px #5dff84; }
+    .intel-marker.flagged::before { background: #ffb347; box-shadow: 0 0 12px #ffb347; }
+
+    @keyframes pulseRing {
+      0% { transform: scale(0.6); opacity: 0.9; }
+      100% { transform: scale(1.75); opacity: 0; }
+    }
+
+    #leafletMap .leaflet-popup-content-wrapper,
+    #leafletMap .leaflet-popup-tip {
+      background: #0a0a0a;
+      border: 1px solid var(--primary);
+      color: var(--primary);
+      font-family: "Share Tech Mono", monospace;
+      box-shadow: 0 0 12px rgba(0, 255, 65, 0.25);
+    }
+
+    #leafletMap .leaflet-popup-content {
+      margin: 10px 12px;
+      min-width: 240px;
+      line-height: 1.4;
+      font-size: 0.78rem;
+    }
+
+    .popup-badge {
+      display: inline-block;
+      margin-bottom: 6px;
+      padding: 2px 8px;
+      border: 1px solid var(--primary);
+      color: #d4ffe0;
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+    }
+
+    .popup-label {
+      color: var(--secondary);
+    }
+
+    .popup-image {
+      max-width: 200px;
+      width: 100%;
+      border: 1px solid rgba(0, 255, 65, 0.45);
+      margin-top: 8px;
+    }
+
+    .detail-content .detail-imint-img {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      margin-top: 10px;
+      border: 1px solid rgba(0, 255, 65, 0.45);
+    }
+
+    .toast-container {
+      position: fixed;
+      top: 92px;
+      right: 14px;
+      z-index: 80;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .node-detail-panel {
+      position: absolute;
+      top: 0;
+      right: -410px;
+      width: 400px;
+      height: 100%;
+      background: rgba(8, 8, 8, 0.96);
+      border: 1px solid rgba(0, 255, 65, 0.55);
+      box-shadow: -8px 0 18px rgba(0, 0, 0, 0.5);
+      z-index: 2000;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: right 0.3s ease;
+    }
+
+    .node-detail-panel.open { right: 0; }
+
+    .detail-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .detail-badge {
+      border: 1px solid var(--primary);
+      padding: 4px 8px;
+      font-size: 0.75rem;
+    }
+
+    .detail-close {
+      width: 26px;
+      height: 26px;
+      padding: 0;
+    }
+
+    .detail-content {
+      overflow: auto;
+      font-size: 0.78rem;
+      line-height: 1.5;
+      border: 1px solid rgba(0, 255, 65, 0.35);
+      padding: 10px;
+      flex: 1;
+      background: rgba(0, 0, 0, 0.45);
+    }
+
+    .threat-indicator {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 2px 8px;
+      border: 1px solid currentColor;
+      font-size: 0.72rem;
+    }
+
+    .threat-low { color: #7dff7d; }
+    .threat-medium { color: #ffd168; }
+    .threat-high { color: #ff9b68; }
+    .threat-critical { color: #ff4f4f; }
+
+    .detail-actions {
+      display: grid;
+      gap: 8px;
+    }
+
+    .toast {
+      min-width: 280px;
+      max-width: 360px;
+      background: rgba(0, 0, 0, 0.9);
+      color: #d4ffe0;
+      border: 1px solid rgba(0, 255, 65, 0.4);
+      border-left: 4px solid var(--primary);
+      padding: 10px 12px;
+      font-size: 0.78rem;
+      font-family: "Share Tech Mono", monospace;
+      transform: translateX(120%);
+      opacity: 0;
+      animation: toastIn 0.35s ease forwards;
+    }
+
+    .toast.success { border-left-color: var(--primary); }
+    .toast.warning { border-left-color: var(--secondary); color: #ffd1ae; }
+    .toast.error { border-left-color: var(--critical); color: #ffb0b0; }
+
+    .toast.exit {
+      animation: toastOut 0.35s ease forwards;
+    }
+
+    @keyframes toastIn {
+      from { transform: translateX(120%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    @keyframes toastOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(120%); opacity: 0; }
+    }
+
+    .feed h2 {
+      color: var(--secondary);
+      font-size: 1rem;
+    }
+
+    .stats-panel {
+      border: 1px solid rgba(0, 255, 65, 0.45);
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.45);
+    }
+
+    .stat-row {
+      display: grid;
+      grid-template-columns: 58px 1fr 28px;
+      gap: 8px;
+      align-items: center;
+      font-size: 0.72rem;
+      margin-bottom: 7px;
+    }
+
+    .stat-track {
+      height: 8px;
+      background: #101010;
+      border: 1px solid rgba(0, 255, 65, 0.2);
+      overflow: hidden;
+    }
+
+    .stat-fill {
+      height: 100%;
+      width: 0%;
+      transition: width 0.25s ease;
+    }
+
+    .stat-fill.osint { background: #2d8dff; }
+    .stat-fill.humint { background: #00ff41; }
+    .stat-fill.imint { background: #ff2f2f; }
+
+    .feed-log {
+      flex: 1;
+      overflow: auto;
+      border: 1px solid rgba(0, 255, 65, 0.5);
+      background: rgba(0, 0, 0, 0.55);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      min-height: 0;
+    }
+
+    .log-entry {
+      border-left: 2px solid var(--primary);
+      padding-left: 8px;
+      font-size: 0.83rem;
+      line-height: 1.4;
+    }
+
+    .log-entry.warning {
+      border-left-color: var(--secondary);
+      color: #ffd1ae;
+    }
+
+    .log-entry.critical {
+      border-left-color: var(--critical);
+      color: #ff9b9b;
+    }
+
+    .bottom {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      align-items: center;
+      gap: 12px;
+      padding: 0 14px;
+      font-size: 0.9rem;
+    }
+
+    .field-label {
+      color: var(--secondary);
+      margin-right: 8px;
+    }
+
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+      background: #111;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 255, 65, 0.5);
+      border: 1px solid #003a0f;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 255, 65, 0.8);
+    }
+
+    .boot-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50000;
+      background: rgba(0, 0, 0, 0.95);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: opacity 0.6s ease;
+    }
+
+    .boot-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .boot-panel {
+      width: min(680px, 90vw);
+      border: 1px solid var(--primary);
+      box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+      padding: 18px;
+      background: #050505;
+    }
+
+    .boot-title {
+      color: var(--secondary);
+      margin-bottom: 16px;
+      font-size: 1.1rem;
+    }
+
+    .boot-row {
+      margin-bottom: 12px;
+      font-size: 0.85rem;
+    }
+
+    .boot-bar {
+      height: 10px;
+      border: 1px solid var(--primary);
+      margin-top: 6px;
+      background: #020202;
+      overflow: hidden;
+    }
+
+    .boot-fill {
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, #006b20, var(--primary));
+      animation: fillBar 1.6s forwards;
+    }
+
+    .boot-fill.delay1 { animation-delay: 0.25s; }
+    .boot-fill.delay2 { animation-delay: 0.5s; }
+    .boot-fill.delay3 { animation-delay: 0.75s; }
+
+    @keyframes fillBar {
+      to { width: 100%; }
+    }
+
+    .shortcut-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 25000;
+      background: rgba(0, 0, 0, 0.88);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .shortcut-overlay.open {
+      display: flex;
+    }
+
+    .audit-debug-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 99998;
+      background: rgba(0, 0, 0, 0.88);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .audit-debug-overlay.open {
+      display: flex;
+    }
+
+    .audit-debug-panel {
+      width: min(520px, 96vw);
+      max-height: 88vh;
+      overflow: auto;
+      border: 1px solid var(--primary);
+      background: #0a0a0a;
+      box-shadow: 0 0 18px rgba(0, 255, 65, 0.35);
+      padding: 14px;
+    }
+
+    .audit-debug-body {
+      margin: 12px 0;
+      font-size: 0.72rem;
+      line-height: 1.45;
+      color: #9bffb7;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .audit-debug-close {
+      width: 100%;
+    }
+
+    .shortcut-panel {
+      width: min(560px, 90vw);
+      border: 1px solid var(--primary);
+      background: #0a0a0a;
+      box-shadow: 0 0 14px rgba(0, 255, 65, 0.25);
+      padding: 14px;
+    }
+
+    .shortcut-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+    }
+
+    .shortcut-table td {
+      border-bottom: 1px solid rgba(0, 255, 65, 0.2);
+      padding: 7px 6px;
+    }
+
+    .shortcut-table td:first-child {
+      color: var(--secondary);
+      width: 80px;
+    }
+
+    .header.glitch-flash {
+      animation: headerFlash 0.18s steps(1, end) 3;
+    }
+
+    @keyframes headerFlash {
+      0% { filter: brightness(1); }
+      50% { filter: brightness(1.35); }
+      100% { filter: brightness(1); }
+    }
+
+    @media (max-width: 1180px) {
+      .main {
+        grid-template-columns: 240px 1fr 260px;
+      }
+      .header {
+        grid-template-columns: 1fr;
+        padding: 8px 12px;
+      }
+      .clock,
+      .status-inline,
+      .classification {
+        justify-self: start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="boot-overlay" id="bootOverlay" aria-live="polite">
+    <div class="boot-panel">
+      <div class="boot-title">INITIALIZING SYSTEMS...</div>
+      <div class="boot-row">
+        LOADING MAP DATA
+        <div class="boot-bar"><div class="boot-fill delay1"></div></div>
+      </div>
+      <div class="boot-row">
+        CONNECTING TO NODES
+        <div class="boot-bar"><div class="boot-fill delay2"></div></div>
+      </div>
+      <div class="boot-row">
+        ESTABLISHING SECURE LINK
+        <div class="boot-bar"><div class="boot-fill delay3"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard">
+    <header class="header panel">
+      <h1 class="title">CYBERJOAR // STRATEGIC FUSION DASHBOARD</h1>
+      <div class="status-inline">
+        <span class="dot" aria-hidden="true"></span>
+        <span class="status-text">SYSTEM ONLINE</span>
+      </div>
+      <div class="clock" id="clock">UTC --:--:--</div>
+      <div class="classification">TOP SECRET // NOFORN</div>
+    </header>
+
+    <main class="main">
+      <aside class="sidebar panel">
+        <section>
+          <div class="node-search">
+            <input id="nodeSearchInput" type="text" placeholder="🔍 SEARCH NODES...">
+            <button type="button" class="clear-search" id="clearSearchBtn">×</button>
+          </div>
+        </section>
+
+        <section>
+          <h2 class="section-title">INTELLIGENCE SOURCE</h2>
+          <div class="filter-buttons" id="filters">
+            <button class="active-filter" data-source="ALL">ALL</button>
+            <button data-source="OSINT">OSINT</button>
+            <button data-source="HUMINT">HUMINT</button>
+            <button data-source="IMINT">IMINT</button>
+          </div>
+        </section>
+
+        <section>
+          <h2 class="section-title">THREAT LEVEL</h2>
+          <select class="threat-select" id="threatSelect">
+            <option value="GREEN">GREEN // STEADY</option>
+            <option value="AMBER" selected>AMBER // ELEVATED</option>
+            <option value="RED">RED // CRITICAL</option>
+          </select>
+        </section>
+
+        <section>
+          <h2 class="section-title">SECURE INGEST</h2>
+          <div class="upload-zone" id="uploadZone">
+            <div class="upload-copy">
+              DROP INTEL FILES HERE<br>
+              <span class="upload-icons">.CSV / .JSON / .JPG</span>
+            </div>
+          </div>
+          <input type="file" id="fileInput" accept=".csv,.json,.jpg,.jpeg" hidden>
+        </section>
+
+        <section class="mongo-cloud-panel">
+          <h2 class="section-title">☁️ CLOUD INTEL SOURCES</h2>
+          <div id="mongoStatus" class="mongo-status disconnected" role="status">● DISCONNECTED</div>
+          <button type="button" class="btn-mongo-sync" id="syncMongoBtn">⟳ SYNC FROM MONGODB</button>
+          <button type="button" class="btn-mongo-seed" id="seedMongoBtn">SEED DATABASE</button>
+        </section>
+
+        <section class="ai-panel" id="aiPanel">
+          <button type="button" class="ai-panel-header" id="aiPanelToggle">
+            <span>⚡ AI INTEL ANALYSIS</span>
+            <span class="caret">▾</span>
+          </button>
+          <div class="ai-panel-body">
+            <label class="ai-label" for="apiKeyInput">API KEY</label>
+            <input id="apiKeyInput" class="ai-input" type="password" placeholder="Anthropic API key">
+
+            <label class="ai-label" for="analysisType">SELECT ANALYSIS TYPE</label>
+            <select id="analysisType" class="ai-select">
+              <option>THREAT ASSESSMENT</option>
+              <option>PATTERN OF LIFE ANALYSIS</option>
+              <option>ROUTE PREDICTION</option>
+              <option>ANOMALY DETECTION</option>
+              <option>STRATEGIC SUMMARY</option>
+            </select>
+
+            <label class="ai-label" for="missionContext">MISSION CONTEXT</label>
+            <textarea id="missionContext" class="ai-textarea" rows="3" placeholder="OPTIONAL CONTEXT FOR ANALYSIS"></textarea>
+
+            <button type="button" class="ai-generate" id="generateReportBtn">▶ GENERATE REPORT</button>
+            <div class="ai-status" id="aiStatusLine"></div>
+          </div>
+        </section>
+      </aside>
+
+      <section id="map" class="panel">
+        <div class="map-heading">THEATER FUSION MAP // SATELLITE OVERLAY READY</div>
+        <div class="map-inner">
+          <div id="leafletMap" aria-label="Operational map"></div>
+          <div class="radar-widget" id="radarWidget">
+            <div class="radar-ring r1"></div>
+            <div class="radar-ring r2"></div>
+            <div class="radar-ring r3"></div>
+            <div class="radar-crosshair-h"></div>
+            <div class="radar-crosshair-v"></div>
+            <div class="radar-sweep"></div>
+            <div class="radar-cardinal n">N</div>
+            <div class="radar-cardinal e">E</div>
+            <div class="radar-label">RADAR // ACTIVE</div>
+          </div>
+          <div class="map-instruction" id="mapInstruction">🎯 CLICK MAP TO PLACE IMINT NODE</div>
+          <div class="map-coords" id="coordBar">LAT: --.---- | LNG: --.----</div>
+        </div>
+      </section>
+
+      <aside class="feed panel">
+        <div class="stats-panel">
+          <div class="section-title">NODE STATISTICS</div>
+          <div class="stat-row">
+            <span>OSINT</span>
+            <div class="stat-track"><div id="osintBar" class="stat-fill osint"></div></div>
+            <span id="osintCount">00</span>
+          </div>
+          <div class="stat-row">
+            <span>HUMINT</span>
+            <div class="stat-track"><div id="humintBar" class="stat-fill humint"></div></div>
+            <span id="humintCount">00</span>
+          </div>
+          <div class="stat-row">
+            <span>IMINT</span>
+            <div class="stat-track"><div id="imintBar" class="stat-fill imint"></div></div>
+            <span id="imintCount">00</span>
+          </div>
+        </div>
+        <h2>LIVE INTEL FEED</h2>
+        <div class="feed-log" id="feedLog">
+          <div class="log-entry">[04:12:31Z] OSINT SCRAPE COMPLETE: EASTERN GRID COMMS ANOMALY DETECTED.</div>
+          <div class="log-entry warning">[04:13:06Z] HUMINT CHANNEL SIERRA REPORTS INCREASED VEHICLE FLOW NEAR CHECKPOINT VULCAN.</div>
+          <div class="log-entry">[04:13:44Z] IMINT PASS 7 CONFIRMS NEW HEAT SIGNATURES ALONG RIDGELINE AXIS.</div>
+          <div class="log-entry critical">[04:14:09Z] SIGINT TRIANGULATION FLAGS ENCRYPTED BURST TRAFFIC FROM RESTRICTED BAND.</div>
+          <div class="log-entry">[04:15:02Z] FUSION ENGINE RECONCILED 12 CORRELATED TRACKS; CONFIDENCE 87 PERCENT.</div>
+          <div class="log-entry warning">[04:15:35Z] DRONE RELAY NODE 3 EXPERIENCING INTERMITTENT LATENCY SPIKES.</div>
+        </div>
+      </aside>
+
+      <aside class="node-detail-panel" id="nodeDetailPanel">
+        <div class="detail-head">
+          <div class="detail-badge" id="detailTypeBadge">NODE DETAIL</div>
+          <button type="button" class="detail-close" id="detailCloseBtn">×</button>
+        </div>
+        <div class="detail-content" id="detailContent"></div>
+        <div class="detail-actions">
+          <button type="button" id="markReviewedBtn">MARK AS REVIEWED</button>
+          <button type="button" id="flagFollowupBtn">FLAG FOR FOLLOWUP</button>
+          <button type="button" id="deleteNodeBtn">DELETE NODE</button>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="bottom panel">
+      <div><span class="field-label">NODES ACTIVE:</span><span id="nodesActive">00</span></div>
+      <div><span class="field-label">LAST SYNC:</span><span id="lastSync">UTC 04:16:10</span></div>
+      <div><span class="field-label">OPERATOR:</span>CYBERJOAR-ALPHA</div>
+      <div><button type="button" id="exportSitrepBtn">📄 EXPORT SITREP</button></div>
+    </footer>
+  </div>
+  <div class="toast-container" id="toastContainer"></div>
+  <div class="report-modal" id="reportModal" aria-hidden="true">
+    <div class="report-modal-header">
+      <div class="report-title">// AI GENERATED INTELLIGENCE REPORT //</div>
+      <div class="report-classification">TOP SECRET // SI // TK // NOFORN</div>
+    </div>
+    <div class="report-modal-body" id="reportContent"></div>
+    <div class="report-modal-actions">
+      <button type="button" id="printReportBtn">PRINT REPORT</button>
+      <button type="button" id="exportReportBtn">EXPORT TXT</button>
+      <button type="button" id="closeReportBtn">CLOSE</button>
+    </div>
+  </div>
+  <div class="shortcut-overlay" id="shortcutOverlay">
+    <div class="shortcut-panel">
+      <div class="section-title">KEYBOARD SHORTCUTS</div>
+      <table class="shortcut-table">
+        <tr><td>ESC</td><td>CLOSE OPEN MODALS/PANELS</td></tr>
+        <tr><td>R</td><td>RECENTER MAP</td></tr>
+        <tr><td>1 / 2 / 3 / 4</td><td>SET SOURCE FILTER (ALL / OSINT / HUMINT / IMINT)</td></tr>
+        <tr><td>G</td><td>TOGGLE AI INTEL ANALYSIS PANEL</td></tr>
+        <tr><td>S</td><td>FOCUS NODE SEARCH</td></tr>
+        <tr><td>?</td><td>OPEN/CLOSE THIS HELP OVERLAY</td></tr>
+        <tr><td>CTRL+SHIFT+D</td><td>FEATURE AUDIT OVERLAY (DEBUG)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="audit-debug-overlay" id="auditDebugOverlay" aria-hidden="true">
+    <div class="audit-debug-panel">
+      <div class="section-title">FEATURE AUDIT — CTRL+SHIFT+D</div>
+      <pre class="audit-debug-body" id="auditDebugBody"></pre>
+      <button type="button" class="audit-debug-close" id="auditDebugClose">CLOSE</button>
+    </div>
+  </div>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script>
+    const clockEl = document.getElementById("clock");
+    const lastSyncEl = document.getElementById("lastSync");
+    const nodesActiveEl = document.getElementById("nodesActive");
+    const threatSelectEl = document.getElementById("threatSelect");
+    const filtersEl = document.getElementById("filters");
+    const feedLogEl = document.getElementById("feedLog");
+    const uploadZoneEl = document.getElementById("uploadZone");
+    const fileInputEl = document.getElementById("fileInput");
+    const bootOverlayEl = document.getElementById("bootOverlay");
+    const coordBarEl = document.getElementById("coordBar");
+    const mapInstructionEl = document.getElementById("mapInstruction");
+    const toastContainerEl = document.getElementById("toastContainer");
+    const aiPanelEl = document.getElementById("aiPanel");
+    const aiPanelToggleEl = document.getElementById("aiPanelToggle");
+    const analysisTypeEl = document.getElementById("analysisType");
+    const missionContextEl = document.getElementById("missionContext");
+    const generateReportBtnEl = document.getElementById("generateReportBtn");
+    const aiStatusLineEl = document.getElementById("aiStatusLine");
+    const reportModalEl = document.getElementById("reportModal");
+    const reportContentEl = document.getElementById("reportContent");
+    const printReportBtnEl = document.getElementById("printReportBtn");
+    const exportReportBtnEl = document.getElementById("exportReportBtn");
+    const closeReportBtnEl = document.getElementById("closeReportBtn");
+    const nodeSearchInputEl = document.getElementById("nodeSearchInput");
+    const clearSearchBtnEl = document.getElementById("clearSearchBtn");
+    const nodeDetailPanelEl = document.getElementById("nodeDetailPanel");
+    const detailTypeBadgeEl = document.getElementById("detailTypeBadge");
+    const detailContentEl = document.getElementById("detailContent");
+    const detailCloseBtnEl = document.getElementById("detailCloseBtn");
+    const markReviewedBtnEl = document.getElementById("markReviewedBtn");
+    const flagFollowupBtnEl = document.getElementById("flagFollowupBtn");
+    const deleteNodeBtnEl = document.getElementById("deleteNodeBtn");
+    const shortcutOverlayEl = document.getElementById("shortcutOverlay");
+    const auditDebugOverlayEl = document.getElementById("auditDebugOverlay");
+    const auditDebugBodyEl = document.getElementById("auditDebugBody");
+    const auditDebugCloseEl = document.getElementById("auditDebugClose");
+    const exportSitrepBtnEl = document.getElementById("exportSitrepBtn");
+    const osintCountEl = document.getElementById("osintCount");
+    const humintCountEl = document.getElementById("humintCount");
+    const imintCountEl = document.getElementById("imintCount");
+    const osintBarEl = document.getElementById("osintBar");
+    const humintBarEl = document.getElementById("humintBar");
+    const imintBarEl = document.getElementById("imintBar");
+    const headerEl = document.querySelector(".header");
+    const radarWidgetEl = document.getElementById("radarWidget");
+    const radarLabelEl = radarWidgetEl ? radarWidgetEl.querySelector(".radar-label") : null;
+    const filtersButtons = Array.from(filtersEl.querySelectorAll("button"));
+    const mongoStatusEl = document.getElementById("mongoStatus");
+    const syncMongoBtnEl = document.getElementById("syncMongoBtn");
+    const seedMongoBtnEl = document.getElementById("seedMongoBtn");
+    const operatorName = "CYBERJOAR-ALPHA";
+    const BACKEND_API_BASE = "http://localhost:3000";
+    const DEFAULT_CENTER = [34.0, 74.5];
+    const DEFAULT_ZOOM = 7;
+    let mapInstance = null;
+    let pendingImintPlacement = null;
+    let recenterMapFn = null;
+    let aiStatusInterval = null;
+    let latestReportText = "";
+    const intelRegistry = [];
+    const markerRegistry = [];
+    let activeDetailNode = null;
+    let activeSourceFilter = "ALL";
+    let activeSearchTerm = "";
+    let radarDotsDriftInterval = null;
+    let radarAlertTimeout = null;
+
+    const typeToClass = {
+      OSINT: "intel-osint",
+      HUMINT: "intel-humint",
+      IMINT: "intel-imint"
+    };
+
+    const uploadTemplates = {
+      default: `
+        <div class="upload-copy">
+          DROP INTEL FILES HERE<br>
+          <span class="upload-icons">.CSV / .JSON / .JPG</span>
+        </div>
+      `,
+      dragover: `<div class="upload-copy">RELEASE TO INGEST</div>`,
+      processing: `
+        <div class="upload-copy">
+          ANALYZING...
+          <div class="upload-progress"><div class="upload-progress-fill"></div></div>
+        </div>
+      `
+    };
+
+    function formatNow() {
+      const now = new Date();
+      const date = now.toLocaleDateString("en-GB", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      });
+      const time = now.toLocaleTimeString("en-GB", {
+        hour12: false,
+        timeZone: "UTC"
+      });
+      return `${date} UTC ${time}`;
+    }
+
+    function updateClock() {
+      clockEl.textContent = formatNow();
+    }
+
+    function updateSyncAndNodes() {
+      const now = new Date();
+      const hhmmss = now.toLocaleTimeString("en-GB", {
+        hour12: false,
+        timeZone: "UTC"
+      });
+      lastSyncEl.textContent = `UTC ${hhmmss}`;
+      updateNodeStats();
+    }
+
+    function delay(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function addFeedEntry(message, level = "normal") {
+      const entry = document.createElement("div");
+      entry.className = `log-entry${level !== "normal" ? " " + level : ""}`;
+      const stamp = new Date().toLocaleTimeString("en-GB", {
+        hour12: false,
+        timeZone: "UTC"
+      });
+      entry.textContent = `[${stamp}Z] ${message}`;
+      feedLogEl.prepend(entry);
+      if (activeSearchTerm && !entry.textContent.toLowerCase().includes(activeSearchTerm.toLowerCase())) {
+        entry.style.display = "none";
+      }
+    }
+
+    function showToast(message, type = "success") {
+      const toast = document.createElement("div");
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      toastContainerEl.appendChild(toast);
+      setTimeout(() => toast.classList.add("exit"), 3600);
+      setTimeout(() => toast.remove(), 4000);
+    }
+
+    function setMongoStatusUI(connected) {
+      if (!mongoStatusEl) return;
+      mongoStatusEl.classList.toggle("connected", Boolean(connected));
+      mongoStatusEl.classList.toggle("disconnected", !connected);
+      mongoStatusEl.textContent = connected ? "● CONNECTED" : "● DISCONNECTED";
+    }
+
+    async function refreshMongoBackendStatus() {
+      if (!mongoStatusEl) return;
+      try {
+        const res = await fetch(`${BACKEND_API_BASE}/api/mongodb/status`, { method: "GET" });
+        if (!res.ok) throw new Error("bad status");
+        const data = await res.json();
+        setMongoStatusUI(Boolean(data.connected));
+      } catch (e) {
+        setMongoStatusUI(false);
+      }
+    }
+
+    function hasActiveNodeId(nodeId) {
+      const id = String(nodeId);
+      return markerRegistry.some((entry) => !entry.deleted && String(entry.node.id) === id);
+    }
+
+    async function syncFromMongoDB() {
+      if (!mapInstance) {
+        showToast("⚠ MAP NOT READY", "warning");
+        return;
+      }
+      let res;
+      try {
+        res = await fetch(`${BACKEND_API_BASE}/api/mongodb/nodes`, { method: "GET" });
+      } catch (e) {
+        setMongoStatusUI(false);
+        showToast("⚠ BACKEND OFFLINE — START NODE SERVER", "warning");
+        return;
+      }
+      if (!res.ok) {
+        setMongoStatusUI(false);
+        showToast("⚠ BACKEND OFFLINE — START NODE SERVER", "warning");
+        return;
+      }
+      let nodes;
+      try {
+        nodes = await res.json();
+      } catch (e) {
+        showToast("⚠ BACKEND OFFLINE — START NODE SERVER", "warning");
+        return;
+      }
+      if (!Array.isArray(nodes)) {
+        showToast("⚠ INVALID RESPONSE FROM BACKEND", "error");
+        return;
+      }
+      let loaded = 0;
+      nodes.forEach((raw) => {
+        const id = raw && raw.id != null ? String(raw.id) : "";
+        if (!id || hasActiveNodeId(id)) return;
+        const node = {
+          id,
+          type: normalizeIntelType(raw.type, "HUMINT"),
+          lat: Number(raw.lat),
+          lng: Number(raw.lng),
+          title: raw.title || id,
+          description: raw.description || "",
+          timestamp: raw.timestamp || formatNow(),
+          threatLevel: raw.threatLevel || inferThreatLevel(raw),
+          status: raw.status || "active",
+          imageUrl: raw.imageUrl || ""
+        };
+        if (Number.isNaN(node.lat) || Number.isNaN(node.lng)) return;
+        createIntelMarker(node);
+        addFeedEntry(`[MONGODB] NODE ${id} LOADED AT ${node.lat.toFixed(4)},${node.lng.toFixed(4)}`);
+        loaded += 1;
+      });
+      updateSyncAndNodes();
+      await refreshMongoBackendStatus();
+      showToast(`✓ MONGODB SYNC — ${loaded} NODES LOADED`, "success");
+    }
+
+    async function seedMongoDatabase() {
+      let res;
+      try {
+        res = await fetch(`${BACKEND_API_BASE}/api/mongodb/seed`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      } catch (e) {
+        setMongoStatusUI(false);
+        showToast("⚠ BACKEND OFFLINE — START NODE SERVER", "warning");
+        return;
+      }
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        if (res.status === 503 || /not connected/i.test(errText)) {
+          showToast("⚠ MONGODB NOT CONNECTED ON SERVER", "warning");
+        } else {
+          showToast("⚠ BACKEND OFFLINE — START NODE SERVER", "warning");
+        }
+        setMongoStatusUI(false);
+        return;
+      }
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        showToast("⚠ SEED RESPONSE INVALID", "error");
+        return;
+      }
+      if (data.error) {
+        showToast(`⚠ ${data.error}`, "error");
+        return;
+      }
+      showToast("✓ DATABASE SEEDED — 5 SAMPLE NODES ADDED", "success");
+      await refreshMongoBackendStatus();
+      await syncFromMongoDB();
+    }
+
+    function setAiStatus(loading) {
+      if (aiStatusInterval) {
+        clearInterval(aiStatusInterval);
+        aiStatusInterval = null;
+      }
+      if (!loading) {
+        aiStatusLineEl.textContent = "";
+        return;
+      }
+      let dots = 0;
+      aiStatusLineEl.textContent = "QUERYING AI CORE";
+      aiStatusInterval = setInterval(() => {
+        dots = (dots + 1) % 4;
+        aiStatusLineEl.textContent = `QUERYING AI CORE${".".repeat(dots)}`;
+      }, 380);
+    }
+
+    function formatCompactTime() {
+      return new Date().toLocaleTimeString("en-GB", { hour12: false, timeZone: "UTC" });
+    }
+
+    function inferThreatLevel(node) {
+      const desc = String(node.description || "").toUpperCase();
+      if (desc.includes("CRITICAL") || desc.includes("CATASTROPHIC")) return "CRITICAL";
+      if (desc.includes("ENCRYPT") || desc.includes("EMPLACEMENT") || node.type === "IMINT") return "HIGH";
+      if (desc.includes("ANOMALY") || desc.includes("SURGE") || desc.includes("CACHE")) return "MEDIUM";
+      return "LOW";
+    }
+
+    function normalizeIntelType(type, fallback) {
+      const t = String(type || "").toUpperCase();
+      if (t === "OSINT" || t === "HUMINT" || t === "IMINT") return t;
+      return fallback;
+    }
+
+    function threatClass(level) {
+      if (level === "CRITICAL") return "threat-critical";
+      if (level === "HIGH") return "threat-high";
+      if (level === "MEDIUM") return "threat-medium";
+      return "threat-low";
+    }
+
+    function renderRadarDots() {
+      const radarWidget = radarWidgetEl;
+      if (!radarWidget) return;
+      radarWidget.querySelectorAll(".radar-dot:not(.alert-dot)").forEach((dot) => dot.remove());
+      const dotCount = Math.min(4, Math.max(3, markerRegistry.filter((r) => !r.deleted).length));
+      for (let i = 0; i < dotCount; i += 1) {
+        const dot = document.createElement("span");
+        dot.className = "radar-dot";
+        dot.style.left = `${20 + Math.random() * 110}px`;
+        dot.style.top = `${20 + Math.random() * 90}px`;
+        dot.style.animationDelay = `${Math.random() * 1.8}s`;
+        radarWidget.appendChild(dot);
+      }
+      if (radarDotsDriftInterval) clearInterval(radarDotsDriftInterval);
+      radarDotsDriftInterval = setInterval(() => {
+        radarWidget.querySelectorAll(".radar-dot:not(.alert-dot)").forEach((dot) => {
+          const currentLeft = Number(dot.style.left.replace("px", "")) || 75;
+          const currentTop = Number(dot.style.top.replace("px", "")) || 75;
+          const nextLeft = Math.max(12, Math.min(138, currentLeft + (Math.random() * 18 - 9)));
+          const nextTop = Math.max(12, Math.min(138, currentTop + (Math.random() * 18 - 9)));
+          dot.style.left = `${nextLeft}px`;
+          dot.style.top = `${nextTop}px`;
+        });
+      }, 3000);
+    }
+
+    function resetRadarAlert() {
+      if (!radarWidgetEl) return;
+      radarWidgetEl.classList.remove("alert");
+      radarWidgetEl.querySelectorAll(".alert-dot").forEach((dot) => dot.remove());
+      if (radarLabelEl) radarLabelEl.textContent = "RADAR // ACTIVE";
+      if (radarAlertTimeout) {
+        clearTimeout(radarAlertTimeout);
+        radarAlertTimeout = null;
+      }
+    }
+
+    function setRadarAlert(nodeId, lat, lng) {
+      if (!radarWidgetEl) return;
+      resetRadarAlert();
+      radarWidgetEl.classList.add("alert");
+      if (radarLabelEl) radarLabelEl.textContent = `⚠ TRACKING // ${nodeId}`;
+
+      const centerLat = DEFAULT_CENTER[0];
+      const centerLng = DEFAULT_CENTER[1];
+      const scale = 12;
+      const x = 75 + (lng - centerLng) * scale;
+      const y = 75 - (lat - centerLat) * scale;
+      const alertDot = document.createElement("span");
+      alertDot.className = "radar-dot alert-dot";
+      alertDot.style.left = `${Math.max(8, Math.min(142, x))}px`;
+      alertDot.style.top = `${Math.max(8, Math.min(142, y))}px`;
+      radarWidgetEl.appendChild(alertDot);
+
+      radarAlertTimeout = setTimeout(() => {
+        resetRadarAlert();
+      }, 8000);
+    }
+
+    function updateNodeStats() {
+      const active = markerRegistry.filter((entry) => !entry.deleted);
+      const counts = { OSINT: 0, HUMINT: 0, IMINT: 0 };
+      active.forEach((entry) => {
+        const t = entry.node.type;
+        if (counts[t] !== undefined) counts[t] += 1;
+      });
+      const total = Math.max(1, active.length);
+      osintCountEl.textContent = String(counts.OSINT).padStart(2, "0");
+      humintCountEl.textContent = String(counts.HUMINT).padStart(2, "0");
+      imintCountEl.textContent = String(counts.IMINT).padStart(2, "0");
+      osintBarEl.style.width = `${(counts.OSINT / total) * 100}%`;
+      humintBarEl.style.width = `${(counts.HUMINT / total) * 100}%`;
+      imintBarEl.style.width = `${(counts.IMINT / total) * 100}%`;
+      nodesActiveEl.textContent = String(active.length);
+      renderRadarDots();
+    }
+
+    function applyMarkerVisibility(entry, visible, matched) {
+      if (!mapInstance) return;
+      if (visible) {
+        if (!mapInstance.hasLayer(entry.marker)) entry.marker.addTo(mapInstance);
+      } else if (mapInstance.hasLayer(entry.marker)) {
+        entry.marker.removeFrom(mapInstance);
+      }
+
+      const el = entry.marker.getElement();
+      if (!el) return;
+      const markerCore = el.querySelector(".intel-marker");
+      if (!markerCore) return;
+      markerCore.classList.toggle("match", Boolean(matched));
+    }
+
+    function applySearchAndFilters() {
+      if (!mapInstance) return;
+      const term = activeSearchTerm.trim().toLowerCase();
+      markerRegistry.forEach((entry) => {
+        if (entry.deleted) return;
+        const sourcePass = activeSourceFilter === "ALL" || entry.node.type === activeSourceFilter;
+        const textBlock = `${entry.node.id} ${entry.node.title} ${entry.node.description} ${entry.node.type}`.toLowerCase();
+        const matched = term ? textBlock.includes(term) : false;
+        const searchPass = term ? matched : true;
+        applyMarkerVisibility(entry, sourcePass && searchPass, matched);
+      });
+
+      const feedEntries = Array.from(feedLogEl.querySelectorAll(".log-entry"));
+      feedEntries.forEach((entry) => {
+        const txt = entry.textContent ? entry.textContent.toLowerCase() : "";
+        entry.style.display = term && !txt.includes(term) ? "none" : "";
+      });
+    }
+
+    function closeNodeDetailPanel() {
+      nodeDetailPanelEl.classList.remove("open");
+      activeDetailNode = null;
+    }
+
+    function renderNodeDetail(entry) {
+      if (!entry || entry.deleted) return;
+      const node = entry.node;
+      const threat = node.threatLevel || inferThreatLevel(node);
+      node.threatLevel = threat;
+      detailTypeBadgeEl.textContent = node.type;
+      detailContentEl.innerHTML = `
+        <div><span class="popup-label">NODE ID:</span> ${escapeHtml(node.id)}</div>
+        <div><span class="popup-label">COORD:</span> ${node.lat.toFixed(4)}, ${node.lng.toFixed(4)}</div>
+        <div><span class="popup-label">TIMESTAMP:</span> ${escapeHtml(node.timestamp)}</div>
+        <div><span class="popup-label">TITLE:</span> ${escapeHtml(node.title || "UNTITLED")}</div>
+        <div style="margin-top:6px;"><span class="popup-label">DESCRIPTION:</span><br>${escapeHtml(node.description)}</div>
+        ${node.imageDataUrl ? `<img class="detail-imint-img" src="${node.imageDataUrl}" alt="${escapeHtml(node.fileName || "IMINT")}">` : ""}
+        ${!node.imageDataUrl && node.imageUrl ? `<img class="detail-imint-img" src="${escapeHtml(node.imageUrl)}" alt="Intel image">` : ""}
+        <div class="threat-indicator ${threatClass(threat)}">THREAT LEVEL: ${threat}</div>
+      `;
+      activeDetailNode = entry;
+      nodeDetailPanelEl.classList.add("open");
+    }
+
+    function setUploadZoneState(state, message = "") {
+      uploadZoneEl.classList.remove("dragover", "processing", "success", "error");
+      if (state === "default") {
+        uploadZoneEl.innerHTML = uploadTemplates.default;
+        return;
+      }
+      if (state === "dragover") {
+        uploadZoneEl.classList.add("dragover");
+        uploadZoneEl.innerHTML = uploadTemplates.dragover;
+        return;
+      }
+      if (state === "processing") {
+        uploadZoneEl.classList.add("processing");
+        uploadZoneEl.innerHTML = uploadTemplates.processing;
+        return;
+      }
+      if (state === "success") {
+        uploadZoneEl.classList.add("success");
+        uploadZoneEl.innerHTML = `<div class="upload-copy">✓ INGESTED: ${escapeHtml(message)}</div>`;
+        return;
+      }
+      if (state === "error") {
+        uploadZoneEl.classList.add("error");
+        uploadZoneEl.innerHTML = "<div class=\"upload-copy\">⚠ INVALID FORMAT — REJECTED</div>";
+      }
+    }
+
+    function getMarkerClass(type) {
+      return typeToClass[String(type || "").toUpperCase()] || typeToClass.HUMINT;
+    }
+
+    function buildPopupHtml(node) {
+      const imageSection = node.imageDataUrl
+        ? `<img class="popup-image" src="${node.imageDataUrl}" alt="${escapeHtml(node.fileName || "IMINT IMAGE")}">`
+        : node.imageUrl
+          ? `<img class="popup-image" src="${escapeHtml(node.imageUrl)}" alt="Intel image">`
+          : "";
+
+      return `
+        <div class="popup-badge">${escapeHtml(node.type)}</div><br>
+        <span class="popup-label">NODE ID:</span> ${escapeHtml(node.id)}<br>
+        <span class="popup-label">COORD:</span> ${Number(node.lat).toFixed(4)}, ${Number(node.lng).toFixed(4)}<br>
+        <span class="popup-label">TIMESTAMP:</span> ${escapeHtml(node.timestamp)}<br>
+        <span class="popup-label">BRIEF:</span> ${escapeHtml(node.description)}
+        ${node.fileName ? `<br><span class="popup-label">FILE:</span> ${escapeHtml(node.fileName)}` : ""}
+        ${imageSection}
+      `;
+    }
+
+    function createIntelMarker(node) {
+      if (!mapInstance) return null;
+      const normalizedType = String(node.type || "HUMINT").toUpperCase();
+      const normalizedNode = {
+        ...node,
+        type: normalizedType,
+        lat: Number(node.lat),
+        lng: Number(node.lng),
+        title: node.title || node.id || `${normalizedType} NODE`,
+        description: node.description || "NO DESCRIPTION PROVIDED.",
+        timestamp: node.timestamp || formatNow(),
+        threatLevel: node.threatLevel || inferThreatLevel({ ...node, type: normalizedType })
+      };
+      const icon = L.divIcon({
+        className: "",
+        html: `<div class="intel-marker ${getMarkerClass(normalizedType)}"></div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+      });
+      const marker = L.marker([normalizedNode.lat, normalizedNode.lng], { icon }).addTo(mapInstance);
+      marker.bindPopup(buildPopupHtml(normalizedNode), { closeButton: false, offset: [0, -10] });
+      let markerEntry = null;
+      const onMouseOver = () => marker.openPopup();
+      const onMouseOut = () => marker.closePopup();
+      const onClick = () => {
+        addFeedEntry(`${normalizedType} NODE ${normalizedNode.id} ACCESSED. ${normalizedNode.description}`);
+        setRadarAlert(normalizedNode.id, normalizedNode.lat, normalizedNode.lng);
+        renderNodeDetail(markerEntry);
+      };
+      marker.on("mouseover", onMouseOver);
+      marker.on("mouseout", onMouseOut);
+      marker.on("click", onClick);
+      intelRegistry.push(normalizedNode);
+      markerEntry = {
+        node: normalizedNode,
+        marker,
+        deleted: false,
+        listeners: { onMouseOver, onMouseOut, onClick }
+      };
+      markerRegistry.push(markerEntry);
+      updateNodeStats();
+      applySearchAndFilters();
+      return marker;
+    }
+
+    function splitCsvLine(line) {
+      const parts = [];
+      let current = "";
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i += 1) {
+        const char = line[i];
+        if (char === "\"") {
+          if (inQuotes && line[i + 1] === "\"") {
+            current += "\"";
+            i += 1;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === "," && !inQuotes) {
+          parts.push(current.trim());
+          current = "";
+        } else {
+          current += char;
+        }
+      }
+      parts.push(current.trim());
+      return parts;
+    }
+
+    function parseCsvIntel(text) {
+      const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+      if (lines.length < 2) return [];
+      const headers = splitCsvLine(lines[0]).map((h) => h.toLowerCase());
+      const required = ["id", "type", "lat", "lng", "title", "description", "timestamp"];
+      const hasAllRequired = required.every((key) => headers.includes(key));
+      if (!hasAllRequired) return [];
+
+      const parsed = [];
+      for (let i = 1; i < lines.length; i += 1) {
+        const values = splitCsvLine(lines[i]);
+        const row = {};
+        headers.forEach((header, idx) => {
+          row[header] = (values[idx] || "").replace(/^"(.*)"$/, "$1").trim();
+        });
+        const lat = Number(row.lat);
+        const lng = Number(row.lng);
+        if (!row.id || Number.isNaN(lat) || Number.isNaN(lng)) continue;
+        parsed.push({
+          id: row.id,
+          type: (row.type || "HUMINT").toUpperCase(),
+          lat,
+          lng,
+          title: row.title || "FIELD REPORT",
+          description: row.description || "NO DESCRIPTION PROVIDED.",
+          timestamp: row.timestamp || formatNow()
+        });
+      }
+      return parsed;
+    }
+
+    function parseJsonIntel(text) {
+      const data = JSON.parse(text);
+      if (!Array.isArray(data)) return [];
+      return data
+        .map((item) => {
+          const lat = Number(item.lat);
+          const lng = Number(item.lng);
+          if (!item || !item.id || Number.isNaN(lat) || Number.isNaN(lng)) return null;
+          return {
+            id: String(item.id),
+            type: String(item.type || "OSINT").toUpperCase(),
+            lat,
+            lng,
+            title: String(item.title || "OSINT EVENT"),
+            description: String(item.description || "NO DESCRIPTION PROVIDED."),
+            timestamp: String(item.timestamp || formatNow()),
+            imageDataUrl: item.imageUrl || null
+          };
+        })
+        .filter(Boolean);
+    }
+
+    async function readFileAsText(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("Unable to read file."));
+        reader.readAsText(file);
+      });
+    }
+
+    async function readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("Unable to read image."));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function showMapPlacementInstruction(show) {
+      if (show) mapInstructionEl.classList.add("active");
+      else mapInstructionEl.classList.remove("active");
+    }
+
+    async function processUploadedFile(file) {
+      const extension = file.name.toLowerCase().split(".").pop();
+      const isValid = ["csv", "json", "jpg", "jpeg"].includes(extension || "");
+      if (!isValid) {
+        setUploadZoneState("error");
+        addFeedEntry("UPLOAD REJECTED: UNSUPPORTED FILE FORMAT.", "critical");
+        showToast("⚠ INVALID FORMAT — REJECTED", "error");
+        await delay(1300);
+        setUploadZoneState("default");
+        return;
+      }
+
+      setUploadZoneState("processing");
+      await delay(1500);
+
+      try {
+        if (extension === "csv") {
+          const text = await readFileAsText(file);
+          const rows = parseCsvIntel(text);
+          if (!rows.length) throw new Error("No valid CSV rows found.");
+          let ingestCount = 0;
+          rows.forEach((node) => {
+            const intelType = normalizeIntelType(node.type, "HUMINT");
+            const normalized = { ...node, type: intelType };
+            createIntelMarker(normalized);
+            ingestCount += 1;
+            addFeedEntry(`[INGEST] ${intelType} NODE ${normalized.id} ADDED AT ${normalized.lat.toFixed(4)},${normalized.lng.toFixed(4)}`);
+          });
+          showToast(`✓ ${ingestCount} NODES INGESTED FROM CSV`, "success");
+          setUploadZoneState("success", file.name);
+          await delay(3000);
+          setUploadZoneState("default");
+          return;
+        }
+
+        if (extension === "json") {
+          const text = await readFileAsText(file);
+          const nodes = parseJsonIntel(text).map((node) => ({
+            ...node,
+            type: normalizeIntelType(node.type, "OSINT")
+          }));
+          if (!nodes.length) throw new Error("No valid JSON nodes found.");
+          nodes.forEach((node) => {
+            createIntelMarker(node);
+            addFeedEntry(`[INGEST] ${node.type} NODE ${node.id} ADDED AT ${node.lat.toFixed(4)},${node.lng.toFixed(4)}`);
+          });
+          showToast(`✓ ${nodes.length} NODES INGESTED FROM JSON`, "success");
+          setUploadZoneState("success", file.name);
+          await delay(3000);
+          setUploadZoneState("default");
+          return;
+        }
+
+        const imageDataUrl = await readFileAsDataUrl(file);
+        pendingImintPlacement = {
+          fileName: file.name,
+          imageDataUrl,
+          timestamp: formatNow()
+        };
+        showMapPlacementInstruction(true);
+        setUploadZoneState("success", file.name);
+        showToast("WARNING: CLICK MAP TO PLACE IMINT NODE", "warning");
+        addFeedEntry(`[IMINT] IMAGE INGESTED FROM ${file.name}. AWAITING MAP PLACEMENT.`, "warning");
+        await delay(3000);
+        setUploadZoneState("default");
+      } catch (error) {
+        setUploadZoneState("error");
+        addFeedEntry(`INGEST FAILURE: ${error.message}`, "critical");
+        showToast(`ERROR: ${error.message}`, "error");
+        await delay(1600);
+        setUploadZoneState("default");
+      }
+    }
+
+    function buildIntelSnapshot() {
+      const counts = { OSINT: 0, HUMINT: 0, IMINT: 0 };
+      const activeNodes = markerRegistry.filter((entry) => !entry.deleted).map((entry) => entry.node);
+      activeNodes.forEach((node) => {
+        const t = String(node.type || "").toUpperCase();
+        if (counts[t] !== undefined) counts[t] += 1;
+      });
+      const lines = activeNodes.map((node, idx) => {
+        return `${idx + 1}. [${node.type}] ${node.id} | ${node.title} | ${node.description} | ${Number(node.lat).toFixed(4)},${Number(node.lng).toFixed(4)} | ${node.timestamp}`;
+      });
+      return {
+        total: activeNodes.length,
+        counts,
+        lines: lines.length ? lines.join("\n") : "NO INTEL NODES AVAILABLE."
+      };
+    }
+
+    function buildAnalysisPrompt() {
+      const snapshot = buildIntelSnapshot();
+      const analysisType = analysisTypeEl.value;
+      const missionContext = missionContextEl.value.trim() || "NONE PROVIDED";
+      return [
+        `ANALYSIS TYPE: ${analysisType}`,
+        `MISSION CONTEXT: ${missionContext}`,
+        `ACTIVE INTEL NODES: ${snapshot.total}`,
+        `BREAKDOWN: OSINT=${snapshot.counts.OSINT}, HUMINT=${snapshot.counts.HUMINT}, IMINT=${snapshot.counts.IMINT}`,
+        "INTEL DATA POINTS:",
+        snapshot.lines,
+        "",
+        "RETURN FORMAT REQUIRED:",
+        "[EXECUTIVE SUMMARY]",
+        "[THREAT INDICATORS]",
+        "[RECOMMENDED COA]",
+        "[CONFIDENCE LEVEL]"
+      ].join("\n");
+    }
+
+    function buildMockReport() {
+      return `[EXECUTIVE SUMMARY]
+Multi-source fusion from Kashmir and Punjab sectors indicates a coordinated logistics-support pattern rather than isolated local movement. OSINT comms spikes near Srinagar align temporally with HUMINT reporting of checkpoint rotation changes and IMINT detection of prepared earthworks east of the ridgeline axis.
+
+[THREAT INDICATORS]
+- NODE-KSH-047 and NODE-KRG-219 reflect synchronized communications activity across separated terrain corridors.
+- HUMINT sources NODE-HMN-062 and NODE-HMN-089 indicate adaptive mobility and concealment behavior consistent with pre-staging.
+- IMINT NODE-IMT-015 suggests deliberate emplacement preparation, not ad hoc civilian construction.
+- Cross-domain timing convergence elevates risk of short-notice operational maneuver within 24-72 hours.
+
+[RECOMMENDED COA]
+1. Increase persistent ISR coverage on the Srinagar-ridgeline transit arc with emphasis on night-cycle thermal passes.
+2. Deploy pattern-of-life baseline comparison for all vehicle clusters entering high-altitude approach routes.
+3. Prioritize SIGINT tasking on burst encrypted channels correlated to NODE-KSH-047 time windows.
+4. Prepare rapid interdiction options on likely logistics choke points while maintaining low-signature posture.
+
+[CONFIDENCE LEVEL]
+Moderate-High (78%). Confidence is strengthened by OSINT/HUMINT/IMINT convergence; residual uncertainty remains regarding final intent and timeline triggers.`;
+    }
+
+    async function fetchClaudeReport(apiKey, dynamicPrompt) {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-calls": "true"
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          system:
+            "You are a senior intelligence analyst for a strategic operations center. Generate classified intelligence reports in military format. Be specific, use military terminology, reference the provided intel data points. Format output with clear section headers in brackets.",
+          messages: [{ role: "user", content: dynamicPrompt }]
+        })
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error.message);
+      const reportText = data.content[0].text;
+      return reportText;
+    }
+
+    function openReportModal() {
+      reportModalEl.classList.add("open");
+      reportModalEl.setAttribute("aria-hidden", "false");
+    }
+
+    function closeReportModal() {
+      reportModalEl.classList.remove("open");
+      reportModalEl.setAttribute("aria-hidden", "true");
+    }
+
+    async function renderReportTypewriter(text, isError = false) {
+      reportContentEl.classList.toggle("error", isError);
+      reportContentEl.classList.add("typing");
+      reportContentEl.textContent = "";
+      openReportModal();
+      for (let i = 0; i < text.length; i += 1) {
+        reportContentEl.textContent += text[i];
+        await delay(15);
+      }
+      reportContentEl.classList.remove("typing");
+    }
+
+    function initLeafletMap() {
+      const terrainLayer = L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+        maxZoom: 17,
+        attribution: "OpenTopoMap"
+      });
+      const satelliteLayer = L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        { maxZoom: 18, attribution: "Esri World Imagery" }
+      );
+
+      mapInstance = L.map("leafletMap", {
+        center: DEFAULT_CENTER,
+        zoom: DEFAULT_ZOOM,
+        layers: [terrainLayer],
+        zoomControl: false
+      });
+
+      L.control.zoom({ position: "topleft" }).addTo(mapInstance);
+
+      let activeLayer = "terrain";
+      const SatTerrainControl = L.Control.extend({
+        options: { position: "topright" },
+        onAdd() {
+          const container = L.DomUtil.create("div", "leaflet-control command-button");
+          container.innerHTML = "<button type=\"button\" id=\"tileToggle\">🛰️ SAT / 🗺️ TERRAIN</button>";
+          L.DomEvent.disableClickPropagation(container);
+          return container;
+        }
+      });
+      mapInstance.addControl(new SatTerrainControl());
+
+      const RecenterControl = L.Control.extend({
+        options: { position: "topright" },
+        onAdd() {
+          const container = L.DomUtil.create("div", "leaflet-control command-button");
+          container.innerHTML = "<button type=\"button\" id=\"recenterBtn\">RECENTER</button>";
+          L.DomEvent.disableClickPropagation(container);
+          return container;
+        }
+      });
+      mapInstance.addControl(new RecenterControl());
+
+      const LabelControl = L.Control.extend({
+        options: { position: "topleft" },
+        onAdd() {
+          const container = L.DomUtil.create("div", "leaflet-control command-label");
+          container.textContent = "OPERATIONAL AREA: NORTHERN COMMAND";
+          return container;
+        }
+      });
+      mapInstance.addControl(new LabelControl());
+
+      const tileToggleBtn = document.getElementById("tileToggle");
+      const recenterBtn = document.getElementById("recenterBtn");
+
+      tileToggleBtn.addEventListener("click", () => {
+        if (activeLayer === "terrain") {
+          mapInstance.removeLayer(terrainLayer);
+          mapInstance.addLayer(satelliteLayer);
+          activeLayer = "satellite";
+          addFeedEntry("MAP OVERLAY SWITCHED TO SATELLITE IMAGERY.");
+        } else {
+          mapInstance.removeLayer(satelliteLayer);
+          mapInstance.addLayer(terrainLayer);
+          activeLayer = "terrain";
+          addFeedEntry("MAP OVERLAY RETURNED TO TERRAIN ANALYSIS GRID.");
+        }
+      });
+
+      recenterMapFn = () => {
+        mapInstance.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { animate: true, duration: 1.4 });
+        addFeedEntry("MAP RECENTER EXECUTED ON PRIMARY OPERATIONAL AREA.");
+      };
+      recenterBtn.addEventListener("click", () => recenterMapFn());
+
+      mapInstance.on("mousemove", (event) => {
+        const { lat, lng } = event.latlng;
+        coordBarEl.textContent = `LAT: ${lat.toFixed(4)} | LNG: ${lng.toFixed(4)}`;
+      });
+
+      mapInstance.on("mouseout", () => {
+        coordBarEl.textContent = "LAT: --.---- | LNG: --.----";
+      });
+
+      mapInstance.on("click", (event) => {
+        if (!pendingImintPlacement) return;
+        const node = {
+          id: `NODE-IMT-${Math.floor(100 + Math.random() * 900)}`,
+          type: "IMINT",
+          title: "USER-UPLOADED IMINT FRAME",
+          lat: event.latlng.lat,
+          lng: event.latlng.lng,
+          timestamp: pendingImintPlacement.timestamp,
+          description: "UPLOADED SATELLITE FRAME GEO-ANCHORED BY OPERATOR INPUT.",
+          fileName: pendingImintPlacement.fileName,
+          imageDataUrl: pendingImintPlacement.imageDataUrl
+        };
+        createIntelMarker(node);
+        setRadarAlert(node.id, node.lat, node.lng);
+        addFeedEntry(`[IMINT] IMAGE NODE PLACED AT ${node.lat.toFixed(4)},${node.lng.toFixed(4)}`);
+        showToast("✓ IMINT NODE PLACED FROM IMAGE", "success");
+        pendingImintPlacement = null;
+        showMapPlacementInstruction(false);
+      });
+
+      const gridLayer = L.layerGroup().addTo(mapInstance);
+      function redrawGrid() {
+        gridLayer.clearLayers();
+        const bounds = mapInstance.getBounds();
+        const minLat = Math.floor(bounds.getSouth());
+        const maxLat = Math.ceil(bounds.getNorth());
+        const minLng = Math.floor(bounds.getWest());
+        const maxLng = Math.ceil(bounds.getEast());
+        for (let lat = minLat; lat <= maxLat; lat += 1) {
+          L.polyline([[lat, minLng], [lat, maxLng]], {
+            color: "#00ff41",
+            opacity: 0.15,
+            weight: 1,
+            dashArray: "4,8",
+            interactive: false
+          }).addTo(gridLayer);
+        }
+        for (let lng = minLng; lng <= maxLng; lng += 1) {
+          L.polyline([[minLat, lng], [maxLat, lng]], {
+            color: "#00ff41",
+            opacity: 0.15,
+            weight: 1,
+            dashArray: "4,8",
+            interactive: false
+          }).addTo(gridLayer);
+        }
+      }
+      mapInstance.on("moveend zoomend", redrawGrid);
+      redrawGrid();
+
+      const intelNodes = [
+        {
+          type: "OSINT",
+          id: "NODE-KSH-047",
+          title: "SRINAGAR COMMS SURGE",
+          lat: 34.0837,
+          lng: 74.7973,
+          timestamp: "18 APR 2026 04:22Z",
+          description: "CIVIL COMMS MONITORING FLAGS PATTERNED MESSAGE SURGE NEAR SRINAGAR CORRIDOR."
+        },
+        {
+          type: "OSINT",
+          id: "NODE-PNB-113",
+          title: "BORDER SUPPLY QUEUE",
+          lat: 31.6340,
+          lng: 74.8723,
+          timestamp: "18 APR 2026 04:26Z",
+          description: "TRAFFIC SCRAPE IDENTIFIES ABNORMAL SUPPLY VEHICLE QUEUE ALONG BORDER APPROACH."
+        },
+        {
+          type: "OSINT",
+          id: "NODE-KRG-219",
+          title: "RIDGELINE CHANNEL BURST",
+          lat: 34.5539,
+          lng: 76.1349,
+          timestamp: "18 APR 2026 04:28Z",
+          description: "OPEN CHANNEL INTERCEPTS REFERENCE TO RENDEZVOUS WINDOW IN HIGH-ALTITUDE SECTOR."
+        },
+        {
+          type: "HUMINT",
+          id: "NODE-HMN-062",
+          title: "CHECKPOINT ROTATION CHANGE",
+          lat: 34.1526,
+          lng: 74.3597,
+          timestamp: "18 APR 2026 04:31Z",
+          description: "SOURCE REPORTS NEW TEMPORARY CHECKPOINT ACTIVITY WITH ARMED LOOKOUT ROTATIONS."
+        },
+        {
+          type: "HUMINT",
+          id: "NODE-HMN-089",
+          title: "LOGISTICS CACHE RELOCATION",
+          lat: 32.7266,
+          lng: 74.8570,
+          timestamp: "18 APR 2026 04:34Z",
+          description: "FIELD ASSET INDICATES POSSIBLE LOGISTICS CACHE MOVED UNDER LOW-LIGHT CONDITIONS."
+        },
+        {
+          type: "IMINT",
+          id: "NODE-IMT-015",
+          title: "EARTHWORKS DETECTION",
+          lat: 33.7782,
+          lng: 76.5762,
+          timestamp: "18 APR 2026 04:39Z",
+          description: "AERIAL THERMAL PASS REVEALS FRESH EARTHWORKS AND SUSPECT EMPLACEMENT PREPARATION."
+        }
+      ];
+      intelNodes.forEach((node) => createIntelMarker(node));
+      setTimeout(() => mapInstance.invalidateSize(), 100);
+    }
+
+    filtersEl.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLButtonElement)) return;
+      for (const button of filtersEl.querySelectorAll("button")) button.classList.remove("active-filter");
+      target.classList.add("active-filter");
+      activeSourceFilter = target.dataset.source || "ALL";
+      applySearchAndFilters();
+      addFeedEntry(`SOURCE FILTER SET TO ${target.dataset.source}. FUSION STREAM REPRIORITIZED.`);
+    });
+
+    threatSelectEl.addEventListener("change", () => {
+      const level = threatSelectEl.value;
+      if (level === "RED") addFeedEntry("THREAT POSTURE RAISED TO RED. COUNTERMEASURE PROTOCOLS ARMED.", "critical");
+      else if (level === "AMBER") addFeedEntry("THREAT POSTURE SET TO AMBER. SURVEILLANCE CYCLE TIGHTENED.", "warning");
+      else addFeedEntry("THREAT POSTURE RETURNED TO GREEN. MONITORING BASELINE RESTORED.");
+    });
+
+    uploadZoneEl.addEventListener("click", () => fileInputEl.click());
+    fileInputEl.addEventListener("change", async () => {
+      const file = fileInputEl.files && fileInputEl.files[0];
+      if (!file) return;
+      await processUploadedFile(file);
+      fileInputEl.value = "";
+    });
+
+    ["dragenter", "dragover"].forEach((eventType) => {
+      uploadZoneEl.addEventListener(eventType, (event) => {
+        event.preventDefault();
+        setUploadZoneState("dragover");
+      });
+    });
+
+    ["dragleave"].forEach((eventType) => {
+      uploadZoneEl.addEventListener(eventType, (event) => {
+        event.preventDefault();
+        setUploadZoneState("default");
+      });
+    });
+
+    uploadZoneEl.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      const file = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files[0] : null;
+      if (!file) {
+        setUploadZoneState("default");
+        return;
+      }
+      await processUploadedFile(file);
+    });
+
+    aiPanelToggleEl.addEventListener("click", () => {
+      aiPanelEl.classList.toggle("collapsed");
+    });
+
+    const savedKey = localStorage.getItem("cyberjoar_api_key");
+    if (savedKey) document.getElementById("apiKeyInput").value = savedKey;
+
+    document.getElementById("apiKeyInput").addEventListener("input", function () {
+      localStorage.setItem("cyberjoar_api_key", this.value.trim());
+    });
+
+    if (syncMongoBtnEl) {
+      syncMongoBtnEl.addEventListener("click", () => {
+        syncFromMongoDB();
+      });
+    }
+    if (seedMongoBtnEl) {
+      seedMongoBtnEl.addEventListener("click", () => {
+        seedMongoDatabase();
+      });
+    }
+
+    generateReportBtnEl.addEventListener("click", async () => {
+      const apiKey =
+        document.getElementById("apiKeyInput").value.trim() ||
+        localStorage.getItem("cyberjoar_api_key") ||
+        "";
+      if (!apiKey) {
+        showToast("⚠ API KEY REQUIRED", "warning");
+        return;
+      }
+      const dynamicPrompt = buildAnalysisPrompt();
+      let reportText = "";
+      setAiStatus(true);
+      generateReportBtnEl.disabled = true;
+      try {
+        reportText = await fetchClaudeReport(apiKey, dynamicPrompt);
+        latestReportText = reportText;
+        await renderReportTypewriter(reportText, false);
+        addFeedEntry("AI ANALYSIS REPORT GENERATED AND DISPATCHED TO COMMAND VIEW.");
+      } catch (error) {
+        latestReportText = `AI REPORT ERROR:\n${error.message}`;
+        await renderReportTypewriter(latestReportText, true);
+        showToast("AI CORE REQUEST FAILED", "error");
+        addFeedEntry(`AI CORE ERROR: ${error.message}`, "critical");
+      } finally {
+        setAiStatus(false);
+        generateReportBtnEl.disabled = false;
+      }
+    });
+
+    closeReportBtnEl.addEventListener("click", closeReportModal);
+    printReportBtnEl.addEventListener("click", () => window.print());
+    exportReportBtnEl.addEventListener("click", () => {
+      const blob = new Blob([latestReportText || reportContentEl.textContent || ""], { type: "text/plain;charset=utf-8" });
+      const link = document.createElement("a");
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      link.href = URL.createObjectURL(blob);
+      link.download = `cyberjoar-ai-report-${stamp}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+    });
+
+    nodeSearchInputEl.addEventListener("input", () => {
+      activeSearchTerm = nodeSearchInputEl.value;
+      applySearchAndFilters();
+    });
+    clearSearchBtnEl.addEventListener("click", () => {
+      activeSearchTerm = "";
+      nodeSearchInputEl.value = "";
+      applySearchAndFilters();
+    });
+
+    detailCloseBtnEl.addEventListener("click", closeNodeDetailPanel);
+    markReviewedBtnEl.addEventListener("click", () => {
+      if (!activeDetailNode || activeDetailNode.deleted) return;
+      const el = activeDetailNode.marker.getElement();
+      const core = el ? el.querySelector(".intel-marker") : null;
+      if (core) {
+        core.classList.remove("flagged");
+        core.classList.add("reviewed");
+      }
+      activeDetailNode.node.threatLevel = "LOW";
+      addFeedEntry(`NODE ${activeDetailNode.node.id} MARKED AS REVIEWED BY OPERATOR.`);
+      renderNodeDetail(activeDetailNode);
+    });
+    flagFollowupBtnEl.addEventListener("click", () => {
+      if (!activeDetailNode || activeDetailNode.deleted) return;
+      const el = activeDetailNode.marker.getElement();
+      const core = el ? el.querySelector(".intel-marker") : null;
+      if (core) {
+        core.classList.remove("reviewed");
+        core.classList.add("flagged");
+      }
+      activeDetailNode.node.threatLevel = "MEDIUM";
+      addFeedEntry(`NODE ${activeDetailNode.node.id} FLAGGED FOR FOLLOWUP TASKING.`, "warning");
+      renderNodeDetail(activeDetailNode);
+    });
+    deleteNodeBtnEl.addEventListener("click", () => {
+      if (!activeDetailNode || activeDetailNode.deleted) return;
+      const { marker, node, listeners } = activeDetailNode;
+      marker.off("mouseover", listeners.onMouseOver);
+      marker.off("mouseout", listeners.onMouseOut);
+      marker.off("click", listeners.onClick);
+      marker.removeFrom(mapInstance);
+      activeDetailNode.deleted = true;
+      const intelIdx = intelRegistry.indexOf(node);
+      if (intelIdx >= 0) intelRegistry.splice(intelIdx, 1);
+      addFeedEntry(`NODE ${node.id} REMOVED FROM ACTIVE MAP TRACKS.`, "critical");
+      closeNodeDetailPanel();
+      updateNodeStats();
+      applySearchAndFilters();
+    });
+
+    exportSitrepBtnEl.addEventListener("click", () => {
+      const now = formatNow();
+      const activeEntries = markerRegistry.filter((entry) => !entry.deleted);
+      const counts = { OSINT: 0, HUMINT: 0, IMINT: 0 };
+      activeEntries.forEach((entry) => { counts[entry.node.type] += 1; });
+      const body = activeEntries.map((entry, idx) => {
+        const n = entry.node;
+        return `${idx + 1}. [${n.type}] ${n.id}\nTITLE: ${n.title}\nCOORD: ${n.lat.toFixed(4)}, ${n.lng.toFixed(4)}\nTIME: ${n.timestamp}\nTHREAT: ${n.threatLevel || inferThreatLevel(n)}\nDESC: ${n.description}\n`;
+      }).join("\n");
+      const sitrep = [
+        "TOP SECRET // NOFORN",
+        `GENERATED: ${now}`,
+        `OPERATOR: ${operatorName}`,
+        "",
+        `NODE SUMMARY: OSINT=${counts.OSINT} HUMINT=${counts.HUMINT} IMINT=${counts.IMINT} TOTAL=${activeEntries.length}`,
+        "",
+        body || "NO ACTIVE NODES."
+      ].join("\n");
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const blob = new Blob([sitrep], { type: "text/plain;charset=utf-8" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `SITREP_${stamp}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+      addFeedEntry("SITREP EXPORT GENERATED FOR COMMAND DISTRIBUTION.");
+    });
+
+    function toggleShortcutOverlay(forceOpen) {
+      const open = typeof forceOpen === "boolean" ? forceOpen : !shortcutOverlayEl.classList.contains("open");
+      shortcutOverlayEl.classList.toggle("open", open);
+    }
+
+    function runFeatureAudit() {
+      const lines = [];
+      const ok = (name, pass, note = "") => {
+        lines.push(`${pass ? "PASS" : "FAIL"} — ${name}${note ? ` (${note})` : ""}`);
+      };
+
+      ok(
+        "Boot overlay removed after load",
+        !document.getElementById("bootOverlay"),
+        "FAIL if audit opened during first ~2.5s while boot runs"
+      );
+      ok("Header title present", Boolean(document.querySelector(".title")));
+      ok("System online + dot", Boolean(document.querySelector(".status-inline .dot")));
+      ok("UTC clock element", Boolean(document.getElementById("clock")));
+      ok("Classification badge", Boolean(document.querySelector(".classification")));
+      ok("Leaflet map instance", Boolean(mapInstance));
+      ok("Default intel nodes (>=6)", markerRegistry.filter((e) => !e.deleted).length >= 6, `count=${markerRegistry.filter((e) => !e.deleted).length}`);
+      ok("Radar widget in DOM", Boolean(document.getElementById("radarWidget")));
+      ok("Coordinate bar", Boolean(document.getElementById("coordBar")));
+      ok("Stats panel counts", Boolean(osintCountEl && humintCountEl && imintCountEl));
+      ok("Live feed container", Boolean(document.getElementById("feedLog")));
+      ok("AI panel + generate button", Boolean(aiPanelEl && generateReportBtnEl));
+      ok("Report modal", Boolean(reportModalEl));
+      ok("Node detail panel", Boolean(nodeDetailPanelEl));
+      ok("SITREP export button", Boolean(exportSitrepBtnEl));
+      ok("Shortcut help overlay", Boolean(shortcutOverlayEl));
+      ok("Toast container", Boolean(toastContainerEl));
+      ok("Keyboard shortcut input guard", true, "keydown skips shortcuts when focus in input/textarea/select");
+
+      return lines.join("\n");
+    }
+
+    function toggleAuditDebugOverlay() {
+      const open = !auditDebugOverlayEl.classList.contains("open");
+      auditDebugOverlayEl.classList.toggle("open", open);
+      auditDebugOverlayEl.setAttribute("aria-hidden", open ? "false" : "true");
+      if (open) auditDebugBodyEl.textContent = runFeatureAudit();
+    }
+
+    document.addEventListener("keydown", (event) => {
+      if (event.ctrlKey && event.shiftKey && (event.key === "d" || event.key === "D")) {
+        event.preventDefault();
+        toggleAuditDebugOverlay();
+        return;
+      }
+      const tag = document.activeElement.tagName.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      const key = event.key;
+      if (key === "Escape") {
+        closeReportModal();
+        closeNodeDetailPanel();
+        toggleShortcutOverlay(false);
+        auditDebugOverlayEl.classList.remove("open");
+        auditDebugOverlayEl.setAttribute("aria-hidden", "true");
+      } else if ((key === "r" || key === "R") && recenterMapFn) {
+        recenterMapFn();
+      } else if (["1", "2", "3", "4"].includes(key)) {
+        const idx = Number(key) - 1;
+        if (filtersButtons[idx]) filtersButtons[idx].click();
+      } else if (key === "g" || key === "G") {
+        aiPanelEl.classList.toggle("collapsed");
+      } else if (key === "s" || key === "S") {
+        event.preventDefault();
+        nodeSearchInputEl.focus();
+      } else if (key === "?") {
+        toggleShortcutOverlay();
+      }
+    });
+    shortcutOverlayEl.addEventListener("click", (event) => {
+      if (event.target === shortcutOverlayEl) toggleShortcutOverlay(false);
+    });
+
+    auditDebugCloseEl.addEventListener("click", () => {
+      auditDebugOverlayEl.classList.remove("open");
+      auditDebugOverlayEl.setAttribute("aria-hidden", "true");
+    });
+    auditDebugOverlayEl.addEventListener("click", (event) => {
+      if (event.target === auditDebugOverlayEl) {
+        auditDebugOverlayEl.classList.remove("open");
+        auditDebugOverlayEl.setAttribute("aria-hidden", "true");
+      }
+    });
+
+    function scheduleHeaderGlitch() {
+      const delayMs = 8000 + Math.floor(Math.random() * 4000);
+      setTimeout(() => {
+        headerEl.classList.add("glitch-flash");
+        setTimeout(() => headerEl.classList.remove("glitch-flash"), 650);
+        scheduleHeaderGlitch();
+      }, delayMs);
+    }
+
+    function scheduleAutoFeedEntry() {
+      const items = [
+        "[AUTO] SIGNAL DETECTED AT 34.12, 74.55 — OSINT RELAY",
+        "[AUTO] HUMINT ASSET CHECK-IN — NODE ALPHA-7 ACTIVE",
+        "[AUTO] IMAGERY PASS COMPLETE — SECTOR 4 CLEAR"
+      ];
+      const delayMs = 20000 + Math.floor(Math.random() * 20000);
+      setTimeout(() => {
+        addFeedEntry(items[Math.floor(Math.random() * items.length)], "warning");
+        applySearchAndFilters();
+        scheduleAutoFeedEntry();
+      }, delayMs);
+    }
+
+    initLeafletMap();
+    setUploadZoneState("default");
+    updateNodeStats();
+    applySearchAndFilters();
+    updateClock();
+    updateSyncAndNodes();
+    refreshMongoBackendStatus();
+    setInterval(updateClock, 1000);
+    setInterval(updateSyncAndNodes, 30000);
+    scheduleHeaderGlitch();
+    scheduleAutoFeedEntry();
+
+    setTimeout(() => {
+      bootOverlayEl.classList.add("hidden");
+      setTimeout(() => bootOverlayEl.remove(), 700);
+    }, 2500);
+
+    /*
+      SAMPLE CSV (save as sample-humint.csv)
+      id,type,lat,lng,title,description,timestamp
+      NODE-HMN-101,HUMINT,34.1022,74.8123,Checkpoint Movement,"Foot patrol increased around northern crossing.",18 APR 2026 05:10Z
+      NODE-HMN-102,HUMINT,33.9041,75.1450,Suspicious Convoy,"Unmarked trucks observed entering valley route after dusk.",18 APR 2026 05:14Z
+
+      SAMPLE JSON (save as sample-osint.json)
+      [
+        {
+          "id": "NODE-OSI-301",
+          "type": "OSINT",
+          "lat": 34.215,
+          "lng": 74.668,
+          "title": "Comms Spike",
+          "description": "Public channel traffic volume increased 4x in sector delta.",
+          "timestamp": "18 APR 2026 05:18Z"
+        },
+        {
+          "id": "NODE-OSI-302",
+          "type": "OSINT",
+          "lat": 32.989,
+          "lng": 74.921,
+          "title": "Route Pattern",
+          "description": "Vehicle movement cluster indicates possible logistic staging.",
+          "timestamp": "18 APR 2026 05:21Z",
+          "imageUrl": ""
+        }
+      ]
+    */
+  </script>
+</body>
+</html>
